@@ -9,6 +9,7 @@ import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader'; // Add RGBEL
 const ThreeBackground = forwardRef((props, ref) => {
   const mountRef = useRef(null);
   let mixers = [];
+  let environmentMap = null;
 
   useImperativeHandle(ref, () => ({
     playDragonAnimationOnce: () => {
@@ -46,17 +47,19 @@ const ThreeBackground = forwardRef((props, ref) => {
 
     // Load environment map
     const rgbeLoader = new RGBELoader();
-    rgbeLoader.load('/path/to/your/environment.hdr', (texture) => {
+    rgbeLoader.load('/rose/sky2.hdr', (texture) => {
       texture.mapping = THREE.EquirectangularReflectionMapping;
       mainScene.environment = texture;
+      mainScene.background = texture; // Set the background to environment map for better reflections
+      environmentMap = texture;
     });
 
     // Ambient Light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 4.0); // Reduced intensity for balance
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.0); // Adjusted intensity for balance
     mainScene.add(ambientLight);
 
     // Directional Light
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // Increased intensity
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); // Adjusted intensity
     directionalLight.position.set(0, 10, 10);
     directionalLight.castShadow = true; // Enable shadows for directional light
     directionalLight.shadow.mapSize.width = 1024; // Shadow map size
@@ -69,6 +72,11 @@ const ThreeBackground = forwardRef((props, ref) => {
     const pointLight = new THREE.PointLight(0xffffff, 2.0, 1000); // Increased intensity
     pointLight.position.set(50, 50, -100);
     mainScene.add(pointLight);
+
+    // Pink Point Light
+    const pinkLight = new THREE.PointLight(0xff69b4, 2.0, 1000); // Pink color
+    pinkLight.position.set(0, 0, 200); // Position it next to the flower
+    mainScene.add(pinkLight);
 
     // New Spotlight
     const spotlight = new THREE.SpotLight(0xffffff, 3.0, 1000, Math.PI / 6, 0.1, 2);
@@ -83,37 +91,92 @@ const ThreeBackground = forwardRef((props, ref) => {
     mainScene.add(spotlight.target);
 
     const loader = new GLTFLoader();
-    loader.load('/rose/rose.gltf', (gltf) => {
-      console.log('Model loaded:', gltf); // Debugging log
-      const model = gltf.scene;
-      model.scale.set(1000, 1000, 1000);
-      model.position.set(0, -300, -100);
-      model.traverse(node => {
-        if (node.isMesh) {
-          node.castShadow = true; // Cast shadows
-          node.receiveShadow = true; // Receive shadows
-          if (node.material) {
-            node.material.metalness = 0.3;
-            node.material.roughness = 0.1;
-            node.material.envMap = mainScene.environment;
-            node.material.envMapIntensity = 0.2;
+    
+    // Function to load and position roses
+    const loadRose = (position) => {
+      loader.load('/rose/rose.gltf', (gltf) => {
+        console.log('Model loaded:', gltf); // Debugging log
+        const model = gltf.scene;
+        model.scale.set(1000, 1000, 1000);
+        model.rotation.set(0.1,0,0)
+        model.position.set(...position);
+        model.traverse(node => {
+          if (node.isMesh) {
+            node.castShadow = true; // Cast shadows
+            node.receiveShadow = true; // Receive shadows
+            if (node.material) {
+              node.material.metalness = 1; // Increase metalness for more reflectivity
+              node.material.roughness = 0.5; // Decrease roughness for shinier surface
+              if (environmentMap) {
+                node.material.envMap = environmentMap; // Set environment map for reflections
+                node.material.envMapIntensity = 0.90;
+              }
+              node.material.needsUpdate = true; // Ensure material updates
+            }
           }
-        }
-      });
-      mainScene.add(model);
-
-      if (gltf.animations && gltf.animations.length) {
-        const portalMixer = new THREE.AnimationMixer(model);
-        gltf.animations.forEach((clip) => {
-          const action = portalMixer.clipAction(clip);
-          action.play();
-          action.timeScale = 0.05;
         });
-        mixers.push(portalMixer);
-      }
-    }, undefined, (error) => {
-      console.error('Error loading model:', error); // Error handling
-    });
+        mainScene.add(model);
+
+        if (gltf.animations && gltf.animations.length) {
+          const portalMixer = new THREE.AnimationMixer(model);
+          gltf.animations.forEach((clip) => {
+            const action = portalMixer.clipAction(clip);
+            action.play();
+            action.timeScale = 0.05;
+          });
+          mixers.push(portalMixer);
+        }
+      }, undefined, (error) => {
+        console.error('Error loading model:', error); // Error handling
+      });
+    };
+
+    // Function to load and position the ring
+    const loadRing = (position) => {
+      loader.load('/ring/scene.gltf', (gltf) => {
+        console.log('Ring model loaded:', gltf); // Debugging log
+        const model = gltf.scene;
+        model.scale.set(100, 100, 100);
+        model.rotation.set(1,-1,-1)
+        model.position.set(...position);
+        model.traverse(node => {
+          if (node.isMesh) {
+            node.castShadow = true; // Cast shadows
+            node.receiveShadow = true; // Receive shadows
+            if (node.material) {
+              node.material.metalness = 1; // Increase metalness for more reflectivity
+              node.material.roughness = 0.5; // Decrease roughness for shinier surface
+              if (environmentMap) {
+                node.material.envMap = environmentMap; // Set environment map for reflections
+                node.material.envMapIntensity = 0.90;
+              }
+              node.material.needsUpdate = true; // Ensure material updates
+            }
+          }
+        });
+        mainScene.add(model);
+
+        if (gltf.animations && gltf.animations.length) {
+          const ringMixer = new THREE.AnimationMixer(model);
+          gltf.animations.forEach((clip) => {
+            const action = ringMixer.clipAction(clip);
+            action.play();
+            action.timeScale = 0.05;
+          });
+          mixers.push(ringMixer);
+        }
+      }, undefined, (error) => {
+        console.error('Error loading ring model:', error); // Error handling
+      });
+    };
+
+    // Load and position three roses
+    loadRose([0, -300, -200]); // Original rose
+    loadRose([-100, -300, -200]); // Left rose
+    loadRose([100, -320, -200]); // Right rose
+
+    // Load and position the ring
+    loadRing([0, -80, -160]);
 
     camera.position.set(0, 0, 5); // Ensure camera is positioned to view the model
 
